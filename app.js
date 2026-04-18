@@ -108,7 +108,6 @@ class UI {
       caption:     document.getElementById('finalCaption'),
       survival:    document.getElementById('mSurvival'),
       credit:      document.getElementById('mCredit'),
-      savings:     document.getElementById('mSavings'),
       scholar:     document.getElementById('mScholar'),
       debt:        document.getElementById('mDebt'),
       debrief:     document.getElementById('debriefList'),
@@ -135,18 +134,65 @@ class UI {
   }
 
   updateHUD(player) {
-    this.hud.cash.textContent   = `$${Math.round(player.cash).toLocaleString()}`;
+    const oldCash = parseInt(this.hud.cash.textContent.replace(/[$,]/g, '')) || 0;
+    const newCash = Math.round(player.cash);
+    const cashChange = newCash - oldCash;
+
+    this.hud.cash.textContent   = `$${newCash.toLocaleString()}`;
     this.hud.credit.textContent = player.credit;
     this.hud.stress.textContent = player.stress;
     this.hud.stressBar.style.width = player.stress + '%';
     this.hud.debt.textContent   = `$${Math.round(player.debt).toLocaleString()}`;
     this.hud.coins.textContent  = player.coins;
+
+    // Trigger coin animation if cash changed
+    if (cashChange !== 0) {
+      this.showCoinEffect(cashChange);
+    }
+  }
+
+  showCoinEffect(amount) {
+    const cashStat = document.querySelector('.stat.cash');
+    if (!cashStat) return;
+
+    const rect = cashStat.getBoundingClientRect();
+    const effect = document.createElement('div');
+    effect.className = `coin-effect ${amount > 0 ? 'gain' : 'loss'}`;
+    effect.textContent = `${amount > 0 ? '+' : ''}$${Math.abs(amount)}`;
+    effect.style.left = `${rect.left + rect.width / 2}px`;
+    effect.style.top = `${rect.top + rect.height / 2}px`;
+    
+    document.body.appendChild(effect);
+
+    // Play sound
+    if (window.game) {
+      try {
+        if (amount > 0) {
+          window.game.playChaChingSound();
+        } else {
+          window.game.playDingSound();
+        }
+      } catch (e) {
+        console.log('Audio playback failed:', e);
+      }
+    }
+
+    // Remove after animation
+    setTimeout(() => effect.remove(), 1000);
   }
 
   updateWeekTicker(week, scholarCount) {
     this.weekTag.textContent     = `Week ${week} of ${UI.TOTAL_WEEKS}`;
     this.weekCounter.textContent = `Week ${week} of ${UI.TOTAL_WEEKS}`;
     this.scholarTag.textContent  = `🎯 Scholarships: ${scholarCount} found`;
+    
+    // Update progress bar if it exists
+    const progressBar = document.getElementById('weekProgressBar');
+    if (progressBar) {
+      const progress = (week / UI.TOTAL_WEEKS) * 100;
+      progressBar.style.width = `${progress}%`;
+      progressBar.style.background = 'white';
+    }
   }
 
   renderEvent(event, onChoose) {
@@ -159,10 +205,8 @@ class UI {
     this.end.gpa.textContent     = score.gpa.toFixed(2);
     this.end.tier.innerHTML      = `${score.tier.emoji} ${score.tier.name}`;
     this.end.caption.textContent = score.tier.caption;
-
     this.end.survival.textContent = `$${Math.round(player.netWorth).toLocaleString()}`;
     this.end.credit.textContent   = (player.creditDelta >= 0 ? '+' : '') + player.creditDelta + ' pts';
-    this.end.savings.textContent  = (player.savingsRate * 100).toFixed(1) + '%';
     this.end.scholar.textContent  = `${player.scholar} found`;
     this.end.debt.textContent     = `$${player.avoidedDebt.toLocaleString()}`;
 
@@ -189,8 +233,125 @@ class Game {
     this.selectedCharId = null;
     this.player = null;
 
+    // Create audio context for sound effects
+    this.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+
     this.bindActions();
     this.ui.goTo('title');
+  }
+
+  // Cha-ching sound for gaining money
+  playChaChingSound() {
+    const ctx = this.audioContext;
+    const now = ctx.currentTime;
+    
+    // First "cha" - higher pitch
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.frequency.setValueAtTime(800, now);
+    osc1.frequency.exponentialRampToValueAtTime(1200, now + 0.1);
+    gain1.gain.setValueAtTime(0.3, now);
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.15);
+    osc1.start(now);
+    osc1.stop(now + 0.15);
+
+    // Second "ching" - even higher
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.frequency.setValueAtTime(1200, now + 0.1);
+    osc2.frequency.exponentialRampToValueAtTime(1600, now + 0.25);
+    gain2.gain.setValueAtTime(0.3, now + 0.1);
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    osc2.start(now + 0.1);
+    osc2.stop(now + 0.3);
+  }
+
+  // Ding sound for losing money
+  playDingSound() {
+    const ctx = this.audioContext;
+    const now = ctx.currentTime;
+    
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    // Single descending tone
+    osc.frequency.setValueAtTime(600, now);
+    osc.frequency.exponentialRampToValueAtTime(300, now + 0.3);
+    gain.gain.setValueAtTime(0.3, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.3);
+    
+    osc.start(now);
+    osc.stop(now + 0.3);
+  }
+
+  // Buzzer sound for failing GPA
+  playBuzzerSound() {
+    const ctx = this.audioContext;
+    const now = ctx.currentTime;
+    
+    // Harsh buzzer sound - low frequency oscillating
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain);
+    gain.connect(ctx.destination);
+    
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(120, now);
+    osc.frequency.setValueAtTime(100, now + 0.15);
+    osc.frequency.setValueAtTime(120, now + 0.3);
+    osc.frequency.setValueAtTime(100, now + 0.45);
+    
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+    
+    osc.start(now);
+    osc.stop(now + 0.6);
+  }
+
+  // Tada/Success sound for passing GPA
+  playSuccessSound() {
+    const ctx = this.audioContext;
+    const now = ctx.currentTime;
+    
+    // Triumphant ascending fanfare
+    // First note
+    const osc1 = ctx.createOscillator();
+    const gain1 = ctx.createGain();
+    osc1.connect(gain1);
+    gain1.connect(ctx.destination);
+    osc1.frequency.setValueAtTime(523, now); // C5
+    gain1.gain.setValueAtTime(0.3, now);
+    gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.2);
+    osc1.start(now);
+    osc1.stop(now + 0.2);
+
+    // Second note
+    const osc2 = ctx.createOscillator();
+    const gain2 = ctx.createGain();
+    osc2.connect(gain2);
+    gain2.connect(ctx.destination);
+    osc2.frequency.setValueAtTime(659, now + 0.15); // E5
+    gain2.gain.setValueAtTime(0.3, now + 0.15);
+    gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.35);
+    osc2.start(now + 0.15);
+    osc2.stop(now + 0.35);
+
+    // Third note (highest)
+    const osc3 = ctx.createOscillator();
+    const gain3 = ctx.createGain();
+    osc3.connect(gain3);
+    gain3.connect(ctx.destination);
+    osc3.frequency.setValueAtTime(784, now + 0.3); // G5
+    gain3.gain.setValueAtTime(0.35, now + 0.3);
+    gain3.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+    osc3.start(now + 0.3);
+    osc3.stop(now + 0.6);
   }
 
   bindActions() {
@@ -257,6 +418,70 @@ class Game {
     const debrief = ScoreCalculator.buildDebrief(this.player, score.gpa);
     this.ui.renderEndScreen({ player: this.player, score, debrief });
     this.ui.goTo('end');
+
+    // Play sound based on GPA and show explanation if needed
+    setTimeout(() => {
+      if (score.gpa < 2.5) {
+        this.playBuzzerSound();
+        setTimeout(() => this.showGPAExplanation(score.gpa, score.tier), 600);
+      } else {
+        this.playSuccessSound();
+      }
+    }, 500);
+  }
+
+  showGPAExplanation(gpa, tier) {
+    const explanation = document.createElement('div');
+    explanation.style.cssText = `
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--cream);
+      border: 4px solid var(--danger);
+      padding: 32px;
+      max-width: 500px;
+      z-index: 10000;
+      box-shadow: 8px 8px 0 var(--night), 0 0 0 9999px rgba(0,0,0,0.7);
+      font-family: 'VT323', monospace;
+      font-size: 20px;
+      line-height: 1.6;
+    `;
+
+    let message = '';
+    if (gpa === 0.0) {
+      message = `<h3 style="font-family: 'Press Start 2P', monospace; font-size: 16px; color: var(--danger); margin-top: 0;">💀 SEMESTER FAILED</h3>
+        <p><b>You went bankrupt.</b> Your cash dropped below -$500, meaning you couldn't afford basic necessities to continue the semester.</p>
+        <p><b>What this means:</b> In real life, this could mean dropping out, taking a leave of absence, or accumulating dangerous debt.</p>
+        <p><b>Key lesson:</b> Build an emergency fund ($500-1000) before unexpected expenses hit. Use campus resources like emergency grants and food pantries.</p>`;
+    } else if (gpa < 2.0) {
+      message = `<h3 style="font-family: 'Press Start 2P', monospace; font-size: 16px; color: var(--danger); margin-top: 0;">😬 ACADEMIC PROBATION</h3>
+        <p><b>Your GPA: ${gpa.toFixed(2)}</b> - This semester was financially rough. Debt piled up, stress stayed high, and you missed key opportunities.</p>
+        <p><b>What this means:</b> You're surviving but barely. High stress, growing debt, and missed aid opportunities are warning signs.</p>
+        <p><b>Key lesson:</b> Prioritize finding scholarships, avoid payday loans, and use campus financial aid resources before taking on debt.</p>`;
+    } else {
+      message = `<h3 style="font-family: 'Press Start 2P', monospace; font-size: 16px; color: var(--coin-dark); margin-top: 0;">📚 PASSING (BARELY)</h3>
+        <p><b>Your GPA: ${gpa.toFixed(2)}</b> - You made it through, but there's significant room for improvement.</p>
+        <p><b>What this means:</b> You finished the semester, but accumulated some debt or missed opportunities that could have helped you build wealth.</p>
+        <p><b>Key lesson:</b> Focus on the 50/30/20 rule (50% needs, 30% wants, 20% savings), hunt for scholarships early, and avoid high-interest debt.</p>`;
+    }
+
+    explanation.innerHTML = `
+      ${message}
+      <button onclick="this.parentElement.remove()" style="
+        margin-top: 20px;
+        background: var(--coin);
+        border: 3px solid var(--night);
+        padding: 12px 24px;
+        font-family: 'Press Start 2P', monospace;
+        font-size: 10px;
+        cursor: pointer;
+        box-shadow: 3px 3px 0 var(--night);
+        text-transform: uppercase;
+      ">Got It</button>
+    `;
+
+    document.body.appendChild(explanation);
   }
 
   shareScore() {
