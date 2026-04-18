@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financial Survival Semester — EduCents</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Atma:wght@300;400;500;600;700&family=DM+Serif+Text:ital@0;1&family=Dancing+Script:wght@400..700&family=Dosis:wght@200..800&family=DynaPuff:wght@400..700&family=Inria+Serif:ital,wght@0,300;0,400;0,700;1,300;1,400;1,700&family=Jolly+Lodger&family=M+PLUS+1+Code:wght@100..700&family=Modak&family=Playwrite+NL+Guides&family=Roboto+Slab:wght@100..900&family=Sacramento&family=Sour+Gummy:ital,wght@0,100..900;1,100..900&family=Ysabeau+SC:wght@1..1000&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+<div class="wrap">
+
+  <header class="brand">
+    <div class="logo">E$</div>
+    <div>
+      <h1>Financial Survival Semester</h1>
+      <div class="tag">An EduCents game · Hackathon prototype</div>
+    </div>
+  </header>
+
+  <!-- ============ TITLE SCREEN ============ -->
+  <section id="screen-title" class="panel title-hero">
+    <div style="font-size: 64px;">🎓</div>
+    <h2>Can you survive the semester?</h2>
+    <p>You're a community college student with bills, classes, and life coming at you. Make real decisions about money, and see if you can graduate with a <b>Financial GPA of 4.0</b>.</p>
+    <div class="actions-row">
+      <button class="btn" data-action="start">Start Game →</button>
+      <button class="btn ghost" data-action="toggleHowTo">How it works</button>
+    </div>
+    <div id="howto" class="hidden howto">
+      <p><b>1.</b> Pick a character — each has a different real-life financial starting point.</p>
+      <p><b>2.</b> Survive <b>12 weeks</b>. Each week you'll face a curveball.</p>
+      <p><b>3.</b> Your choices shift your <b>Cash, Credit, Stress, Debt, and Scholarship IQ</b>.</p>
+      <p><b>4.</b> At the end, you're scored on a <b>0.0 – 4.0 Financial GPA</b>.</p>
+    </div>
+  </section>
+
+  <!-- ============ CHARACTER SELECT ============ -->
+  <section id="screen-select" class="panel hidden">
+    <h2 style="margin-top:0;">Choose your character</h2>
+    <p style="color: var(--muted); margin-top: 4px;">Each character starts the semester with a different real financial situation.</p>
+    <div id="charGrid" class="char-grid"></div>
+    <div class="actions-row" style="justify-content:flex-end;">
+      <button class="btn ghost" data-action="backToTitle">← Back</button>
+      <button id="startBtn" class="btn" disabled data-action="beginSemester">Begin Semester →</button>
+    </div>
+  </section>
+
+  <!-- ============ GAME SCREEN ============ -->
+  <section id="screen-game" class="panel hidden">
+    <div class="game-header">
+      <div>
+        <div class="tag" id="charLabel">—</div>
+        <h2 style="margin:2px 0 0;" id="charTitle">—</h2>
+      </div>
+      <div style="text-align:right;">
+        <div class="tag">SEMESTER PROGRESS</div>
+        <div style="font-size:20px; font-weight:700;" id="weekCounter">Week 1 of 12</div>
+      </div>
+    </div>
+
+    <!-- HUD -->
+    <div class="hud">
+      <div class="stat cash"><div class="label">💵 Cash</div><div class="value" id="hudCash">$0</div></div>
+      <div class="stat credit"><div class="label">📈 Credit</div><div class="value" id="hudCredit">650</div></div>
+      <div class="stat stress">
+        <div class="label">🧠 Stress</div>
+        <div class="value" id="hudStress">0</div>
+        <div class="bar warn"><span id="hudStressBar" style="width:0%"></span></div>
+      </div>
+      <div class="stat debt"><div class="label">🧾 Debt</div><div class="value" id="hudDebt">$0</div></div>
+      <div class="stat coin"><div class="label">🪙 EduCoins</div><div class="value" id="hudCoins">0</div></div>
+    </div>
+
+    <div class="week">
+      <span id="weekTag">Week 1</span>
+      <span id="scholarTag">🎯 Scholarships: 0 found</span>
+    </div>
+    <div id="eventCard" class="event"></div>
+    <div id="choices" class="choices"></div>
+
+    <div class="log" id="log"></div>
+  </section>
+
+  <!-- ============ END SCREEN ============ -->
+  <section id="screen-end" class="panel hidden">
+    <div class="gpa">
+      <div class="tag" id="endCharTag">—</div>
+      <div class="score" id="finalGPA">0.0</div>
+      <div class="tier" id="finalTier">—</div>
+      <div style="color:var(--muted); margin-top:4px;" id="finalCaption">—</div>
+    </div>
+
+    <div class="metric-grid">
+      <div class="metric"><div class="m-label">Survival Score</div><div class="m-value" id="mSurvival">—</div><div class="m-sub">End-of-semester net worth</div></div>
+      <div class="metric"><div class="m-label">Credit Score Growth</div><div class="m-value" id="mCredit">—</div><div class="m-sub">Change across 12 weeks</div></div>
+      <div class="metric"><div class="m-label">Savings Rate</div><div class="m-value" id="mSavings">—</div><div class="m-sub">% of income banked</div></div>
+      <div class="metric"><div class="m-label">Scholarship IQ</div><div class="m-value" id="mScholar">—</div><div class="m-sub">Aid found & applied</div></div>
+      <div class="metric"><div class="m-label">Debt Avoided</div><div class="m-value" id="mDebt">—</div><div class="m-sub">Predatory loans sidestepped</div></div>
+    </div>
+
+    <div class="debrief">
+      <h4>🤖 EduCents AI · Personalized Debrief</h4>
+      <ul id="debriefList"></ul>
+    </div>
+
+    <div class="leaderboard">
+      <h4>🏆 Campus Leaderboard · This Semester</h4>
+      <div id="leaderboardList"></div>
+    </div>
+
+    <div class="actions-row">
+      <button class="btn ghost" data-action="playAgain">Play Again</button>
+      <button class="btn" data-action="shareScore">📋 Copy Score</button>
+    </div>
+  </section>
+
+  <footer>Prototype v0.2 · EduCents · OOP refactor</footer>
+</div>
+
+<!-- 1. Data  (characters + event cards) -->
+<script src="data.js"></script>
+<!-- 2. Core  (Character, EventCard, EventDeck, Player, ScoreCalculator) -->
+<script src="core.js"></script>
+<!-- 3. App   (Logger, Leaderboard, UI, Game + bootstrap) -->
+<script src="app.js"></script>
+</body>
+</html>
